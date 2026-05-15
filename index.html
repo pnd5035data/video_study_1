@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Grid Experiment</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<section id="welcome-screen" class="screen active">
+<div class="panel">
+    <h1>Welcome</h1>
+    <p>This is a video-grid experiment</p>
+    <p>
+    Click <strong>Start</strong> to begin
+    </p>
+    <div class="actions">
+    <button id="start-btn">Start</button>
+    </div>
+</div>
+</section>
+
+<section id="fixation-screen" class="screen">
+<div class="fixation-wrap">
+    <div class="fixation">+</div>
+    <div id="fixation-status" class="status-box">Preparing trial...</div>
+</div>
+</section>
+
+<section id="grid-screen" class="screen">
+<div class="grid-screen-inner">
+    <div class="top-bar">
+    <div id="trial-counter">Trial 1 / 1</div>
+    <div id="grid-timer">Stimulus on screen</div>
+    </div>
+    <div id="video-grid" class="video-grid"></div>
+</div>
+</section>
+
+<section id="questions-screen" class="screen">
+  <div class="panel">
+    <!-- <h2 id="question-title">Question</h2> -->
+
+    <div style="text-align:center;">
+      <img id="question-image" style="max-width:100%; max-height:60vh; object-fit:contain;" />
+    </div>
+
+    <div style="margin-top:20px; text-align:center;">
+      <div id="response-instruction" class="response-instruction hidden">
+        Press a number key to respond
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section id="saving-screen" class="screen">
+  <div class="panel" style="text-align:center;">
+    <h1>Saving Data</h1>
+    <p style="font-size:24px; font-weight:bold;">
+      Please do not close this browser window.
+    </p>
+    <p class="muted">
+      Your responses are being saved.
+    </p>
+  </div>
+</section>
+
+<section id="goodbye-screen" class="screen">
+<div class="panel" style="text-align:center;">
+    <h1>Goodbye</h1>
+    <p>You have completed the experiment.</p>
+    <div class="actions hidden">
+    <button id="download-json-btn">Download JSON Data</button>
+    <button id="download-csv-btn">Download CSV Data</button>
+    <button id="restart-btn" class="secondary">Restart</button>
+    </div>
+    <pre id="final-data-preview" class="small" style="white-space: pre-wrap; margin-top: 20px;"></pre>
+</div>
+</section>
+
+<script src="app.js"></script>
+</body>
+</html>
