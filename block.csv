@@ -1,0 +1,5 @@
+block_id,block_name,include,fixed_first,randomize_scales,scale_keys
+1,Block 1,1,1,tail_after_first,ratioScale|mascScale|typicalityScale
+2,Power Block,1,0,all,power1|power2|power3|power4|power5|power6
+3,Status Block,1,0,all,status1|status2|status3|status4|status5|status6
+4,Liking Block,1,0,none,like1

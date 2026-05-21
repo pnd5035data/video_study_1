@@ -15,6 +15,7 @@ const EXPERIMENT_CONFIG = {
   maleVideosCsvPath: "maleVideos.csv",
   femaleVideosCsvPath: "femaleVideos.csv",
   conditionCsvPath: "conditionFile.csv",
+  blockCsvPath: "block.csv",
   scalesFolder: "scales",
 
   // Block 1 is always first. Blocks 2-4 are randomized by default.
@@ -56,7 +57,13 @@ const EXPERIMENT_CONFIG = {
     power3: { text: "Power 3", image: "scales/power3.png", min: 1, max: 7, step: 1 },
     power4: { text: "Power 4", image: "scales/power4.png", min: 1, max: 7, step: 1 },
     power5: { text: "Power 5", image: "scales/power5.png", min: 1, max: 7, step: 1 },
-    power6: { text: "Power 6", image: "scales/power6.png", min: 1, max: 7, step: 1 }
+    power6: { text: "Power 6", image: "scales/power6.png", min: 1, max: 7, step: 1 },
+    status1: { text: "Status 1", image: "scales/status1.png", min: 1, max: 7, step: 1 },
+    status2: { text: "Status 2", image: "scales/status2.png", min: 1, max: 7, step: 1 },
+    status3: { text: "Status 3", image: "scales/status3.png", min: 1, max: 7, step: 1 },
+    status4: { text: "Status 4", image: "scales/status4.png", min: 1, max: 7, step: 1 },
+    status5: { text: "Status 5", image: "scales/status5.png", min: 1, max: 7, step: 1 },
+    status6: { text: "Status 6", image: "scales/status6.png", min: 1, max: 7, step: 1 }
   }
 };
 
@@ -187,11 +194,85 @@ function parseCsv(text) {
 // ============================================================
 // DYNAMIC TRIAL GENERATION
 // ============================================================
+function csvBool(value, defaultValue = false) {
+  const s = String(value ?? "").trim().toLowerCase();
+  if (s === "") return defaultValue;
+  return ["1", "true", "yes", "y", "include", "show"].includes(s);
+}
+
+function splitScaleKeys(value) {
+  return String(value || "")
+    .split(/[|;,]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function orderScalesForBlock(scaleKeys, randomizeScalesMode) {
+  const mode = String(randomizeScalesMode || "none").trim().toLowerCase();
+
+  if (mode === "all") {
+    return shuffleArray(scaleKeys);
+  }
+
+  if (mode === "tail_after_first" || mode === "after_first") {
+    if (scaleKeys.length <= 1) return scaleKeys.slice();
+    return [scaleKeys[0], ...shuffleArray(scaleKeys.slice(1))];
+  }
+
+  return scaleKeys.slice();
+}
+
+function buildBlockSpecsFromRows(blockRows, config) {
+  const includedRows = blockRows.filter(row => csvBool(row.include ?? row.show_block, true));
+
+  if (!includedRows.length) {
+    throw new Error("block.csv did not contain any included blocks.");
+  }
+
+  const blockSpecs = includedRows.map((row, index) => {
+    const blockId = Number(row.block_id || row.blockId || index + 1);
+    const blockName = row.block_name || row.blockName || `Block ${blockId}`;
+    const rawScaleKeys = splitScaleKeys(row.scale_keys || row.scales || row.scaleKeys);
+
+    if (!rawScaleKeys.length) {
+      throw new Error(`Block ${blockId} has no scale_keys in block.csv.`);
+    }
+
+    for (const scaleKey of rawScaleKeys) {
+      if (!config.scaleDefinitions[scaleKey]) {
+        throw new Error(`block.csv references unknown scale: ${scaleKey}`);
+      }
+    }
+
+    const fixedFirst = csvBool(row.fixed_first ?? row.fixedFirst, blockId === 1);
+    const randomizeScales = row.randomize_scales || row.randomizeScales || "none";
+
+    return {
+      blockId,
+      blockName,
+      fixedFirst,
+      randomizeScales,
+      rawScaleKeys,
+      scaleKeys: orderScalesForBlock(rawScaleKeys, randomizeScales)
+    };
+  });
+
+  const fixedBlocks = blockSpecs.filter(b => b.fixedFirst);
+  const flexibleBlocks = blockSpecs.filter(b => !b.fixedFirst);
+
+  const orderedFlexibleBlocks = config.randomizeBlocksAfterBlock1
+    ? shuffleArray(flexibleBlocks)
+    : flexibleBlocks;
+
+  return [...fixedBlocks, ...orderedFlexibleBlocks];
+}
+
 async function buildExperimentTrials(config) {
-  const [maleRows, femaleRows, conditionRows] = await Promise.all([
+  const [maleRows, femaleRows, conditionRows, blockRows] = await Promise.all([
     loadCsvRows(config.maleVideosCsvPath),
     loadCsvRows(config.femaleVideosCsvPath),
-    loadCsvRows(config.conditionCsvPath)
+    loadCsvRows(config.conditionCsvPath),
+    loadCsvRows(config.blockCsvPath)
   ]);
 
   const maleVideos = maleRows.map((row, idx) => ({ id: `M${idx + 1}`, url: row.video_file, gender: "M" })).filter(v => v.url);
@@ -219,26 +300,14 @@ async function buildExperimentTrials(config) {
     return shuffleArray([...femaleSet, ...maleSet]);
   });
 
-  const block1Scales = ["ratioScale", ...shuffleArray(["mascScale", "typicalityScale"] )];
-  const powerOrderForBlock2 = shuffleArray(["power1", "power2", "power3", "power4", "power5", "power6"]);
-  const powerOrderForBlock3 = shuffleArray(["power1", "power2", "power3", "power4", "power5", "power6"]);
-
-  const blockSpecs = [
-    { blockId: 1, blockName: "Block 1", scaleKeys: block1Scales },
-    { blockId: 2, blockName: "Block 2", scaleKeys: powerOrderForBlock2 },
-    { blockId: 3, blockName: "Block 3", scaleKeys: powerOrderForBlock3 },
-    { blockId: 4, blockName: "Block 4", scaleKeys: ["like1"] }
-  ];
-
-  const laterBlocks = config.randomizeBlocksAfterBlock1
-    ? shuffleArray(blockSpecs.slice(1))
-    : blockSpecs.slice(1);
-  const finalBlockOrder = [blockSpecs[0], ...laterBlocks];
+  const finalBlockOrder = buildBlockSpecsFromRows(blockRows, config);
 
   const trials = [];
   const blockOrderLog = finalBlockOrder.map(b => b.blockId).join("-");
+  const blockScaleOrders = {};
 
   for (const blockSpec of finalBlockOrder) {
+    blockScaleOrders[`block${blockSpec.blockId}`] = blockSpec.scaleKeys.join("|");
     const randomizedConditions = shuffleArray(ratioConditions);
     let withinBlockTrialIndex = 0;
 
@@ -332,11 +401,10 @@ async function buildExperimentTrials(config) {
       maleVideoCount: maleVideos.length,
       femaleVideoCount: femaleVideos.length,
       conditionCount: ratioConditions.length,
+      blockCount: finalBlockOrder.length,
       totalTrials: finalTrials.length,
       blockOrder: blockOrderLog,
-      block1ScaleOrder: block1Scales.join("|"),
-      block2PowerOrder: powerOrderForBlock2.join("|"),
-      block3PowerOrder: powerOrderForBlock3.join("|")
+      blockScaleOrders
     }
   };
 }
